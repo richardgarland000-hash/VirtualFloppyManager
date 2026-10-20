@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+build/
+*.egg-info/
+.pytest_cache/
+# runtime files created when running from source
+src/floppy_mounter.json
+src/floppy_mounter.json.*
+src/floppy_mounter.log*
+src/floppy_mounter.ico
+# other directories
+.vscode/
+floppy_images/
+previous/
+version_1/
