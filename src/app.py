@@ -233,6 +233,11 @@ class App:
     def replace_drive(self, letter, image, force=False):
         if not force and not self._extension_ok(image):
             return
+        if self.manager.is_same_image(letter, image):
+            messagebox.showinfo("Replace image",
+                                f"That image is already mounted on {letter}:. Choose a different image.",
+                                parent=self.root)
+            return
         rec = self.manager.get(letter)
         if not force and not messagebox.askyesno(
                 "Replace image",

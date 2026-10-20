@@ -56,7 +56,8 @@ Config (`floppy_mounter.json`), log (`floppy_mounter.log`) and a generated icon 
 src/            application code (see module docstrings)
 packaging/      PyInstaller spec, build resources, startup-task script
 tests/          pytest suite (image inspector, config)
-build.py        build driver          build.bat   one-step local build
+build.py        build driver
+build.bat   one-step local build
 .github/        CI: test, build, and publish on tags
 ```
 

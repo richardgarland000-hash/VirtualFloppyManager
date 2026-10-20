@@ -5,6 +5,7 @@ venv/
 build/
 *.egg-info/
 .pytest_cache/
+*.bak
 # runtime files created when running from source
 src/floppy_mounter.json
 src/floppy_mounter.json.*

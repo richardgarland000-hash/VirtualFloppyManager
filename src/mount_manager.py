@@ -90,6 +90,14 @@ class MountManager:
         except BackendError:
             return False
 
+    def is_same_image(self, letter, image):
+        """True if `image` is the file already mounted on `letter`."""
+        rec = self.get(letter.rstrip(":").upper())
+        if not rec or not image.strip():
+            return False
+        candidate = os.path.abspath(os.path.expanduser(image.strip().strip('"')))
+        return _norm(rec.image) == _norm(candidate)
+
     # ---- validation --------------------------------------------------
     def validate_image(self, image, replacing=None):
         path = os.path.abspath(os.path.expanduser(image.strip().strip('"')))
@@ -168,7 +176,9 @@ class MountManager:
     def replace(self, letter, image, force=False, progress=None):
         progress = progress or (lambda m: None)
         letter = letter.rstrip(":").upper()
-        self.validate_image(image, replacing=letter)   # fail before touching the old mount
+        path, _ = self.validate_image(image, replacing=letter)   # fail before touching the old mount
+        if self.is_same_image(letter, path):
+            raise ImageError(f"That image is already mounted on {letter}:. Choose a different image.")
         self.unmount(letter, force, progress)
         try:
             return self.mount(image, letter, progress)

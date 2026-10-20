@@ -69,6 +69,12 @@ class MainWindow:
         self.tree.pack(side="left", fill="both", expand=True)
         sb.pack(side="left", fill="y")
         self.tree.bind("<<TreeviewSelect>>", lambda e: self.update_states())
+
+        # right-click menu on a mounted image
+        self.menu = tk.Menu(self.root, tearoff=0)
+        self.menu.add_command(label="Unmount", command=self._unmount)
+        self.menu.add_command(label="Replace with the selected image", command=self._replace)
+        self.tree.bind("<Button-3>", self._on_right_click)
         side = ttk.Frame(lst)
         side.pack(side="left", fill="y", padx=(8, 0))
         self.unmount_btn = ttk.Button(side, text="Unmount", command=self._unmount)
@@ -92,6 +98,9 @@ class MainWindow:
     def selected_letter(self):
         sel = self.tree.selection()
         return self.tree.item(sel[0], "values")[0].rstrip(":") if sel else None
+
+    def _same_as_mounted(self, letter):
+        return bool(letter) and self.app.manager.is_same_image(letter, self.current_image())
 
     def refresh_history(self):
         self.image_combo["values"] = self.app.config.get("history")
@@ -148,6 +157,24 @@ class MainWindow:
         self.info_var.set(text)
         self.update_states()
 
+    def _on_right_click(self, event):
+        row = self.tree.identify_row(event.y)
+        if not row:
+            return                                   # clicked empty space
+        self.tree.selection_set(row)                 # right-click also selects the row
+        self.tree.focus(row)
+        self.update_states()
+        letter = self.selected_letter()
+        busy = self.app.busy
+        self.menu.entryconfigure(0, label=f"Unmount {letter}:", state="disabled" if busy else "normal")
+        self.menu.entryconfigure(
+            1, state="normal" if self._image_ok and not busy and not self._same_as_mounted(letter)
+            else "disabled")
+        try:
+            self.menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self.menu.grab_release()
+
     # ---- actions -----------------------------------------------------
     def _mount(self):
         letter = self.letter_var.get().rstrip(":")
@@ -187,4 +214,4 @@ class MainWindow:
         self.letter_combo.config(state="readonly" if ok and self.letter_combo["values"] else "disabled")
         self.mount_btn.config(state="normal" if ok and has_letter else "disabled")
         self.unmount_btn.config(state="normal" if sel and not busy else "disabled")
-        self.replace_btn.config(state="normal" if sel and ok else "disabled")
+        self.replace_btn.config(state="normal" if sel and ok and not self._same_as_mounted(sel) else "disabled")
