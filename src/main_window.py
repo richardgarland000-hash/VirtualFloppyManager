@@ -18,7 +18,7 @@ class MainWindow:
         self._after_id = None
 
         root.title(APP_TITLE)
-        root.geometry("660x540")
+        root.geometry("720x540")
         root.minsize(620, 500)
         root.protocol("WM_DELETE_WINDOW", app.on_close_button)
 
