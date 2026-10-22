@@ -2,8 +2,11 @@
 
 A Windows system-tray utility that mounts raw floppy disk images (`.img`, `.ima`, `.flp`, `.vfd`, `.dsk`, `.xdf`, ...) as drive letters, detects the disk's filesystem structure, and keeps track of what is mounted where.
 
-## Features
+## What's new
 - Colored, color-coded interface (header badge, green/amber/red image check, status colors)
+- A few layout fixes
+
+## Features
 - Tray icon with tooltip listing mounted images; right-click menu to open the window, open settings, unmount an image, or quit
 - Browse dialog plus history of the last 10 mounted images
 - Image structure detection: FAT12/16/32 geometry and label, Amiga, HFS/MFS, MBR, and recognition of non-raw containers (IMD, TD0, HFE, VHD)
