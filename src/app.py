@@ -22,6 +22,7 @@ from mount_manager import (ForeignDriveError, ImageError, MountManager,
 from paths import config_path, log_path
 from settings_dialog import SettingsDialog
 from tray import TrayIcon
+import theme
 
 log = logging.getLogger("floppymounter.app")
 
@@ -42,6 +43,7 @@ class App:
 
         self.root = tk.Tk()
         self.root.withdraw()
+        theme.apply_theme(self.root)
         self.icons = Icons()
         self.icons.apply(self.root)
         self.window = MainWindow(self.root, self)
@@ -105,7 +107,7 @@ class App:
         if not (self.config.get("start_hidden") or "--hidden" in sys.argv):
             self.show_window()
         if not is_admin():
-            self.window.status("Not running as administrator - mounting may be refused.")
+            self.window.status("Not running as administrator - mounting may be refused.", "warn")
         self.refresh_state()
         self.root.mainloop()
 
@@ -160,10 +162,11 @@ class App:
     def apply_settings(self):
         app_logging.set_level(self.config.get("log_level"))
         self.refresh_state()
-        self.window.status("Settings saved.")
+        self.window.status("Settings saved.", "success")
 
     # ---- error reporting ---------------------------------------------
     def _report(self, exc, title):
+        self.window.status(f"{title} failed.", "error")
         if isinstance(exc, BackendError) and exc.kind == "not_found":
             if messagebox.askyesno(title, f"{exc}\n\nOpen Settings now?", parent=self.root):
                 self.open_settings()
@@ -197,7 +200,7 @@ class App:
                       lambda e: self._mount_error(e, image, letter))
 
     def _after_mount(self, rec):
-        self.window.status(f"Mounted {rec.name} on {rec.letter}:")
+        self.window.status(f"Mounted {rec.name} on {rec.letter}:", "success")
         if self.config.get("open_explorer_after_mount"):
             try:
                 os.startfile(f"{rec.letter}:\\")
@@ -227,7 +230,7 @@ class App:
     def unmount_drive(self, letter, force=False):
         self.run_task(f"Unmounting {letter}:",
                       lambda p: self.manager.unmount(letter, force, p),
-                      lambda _: self.window.status(f"Unmounted {letter}:"),
+                      lambda _: self.window.status(f"Unmounted {letter}:", "success"),
                       lambda e: self._unmount_error(e, letter, lambda: self.unmount_drive(letter, True)))
 
     def replace_drive(self, letter, image, force=False):

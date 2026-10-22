@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.0
+- Colored interface: blue header band with a mounted-count badge, themed controls, color-coded buttons (green Mount, red Unmount, amber Replace), striped mounted list with read-only rows marked
+- Image info panel is color-coded: green border for a clean image, amber with highlighted warnings, red for errors
+- Status bar message color shows success, warning or error
+- Layout fixes: bottom button bar and Unmount button can no longer be squeezed or clipped
+
 ## 1.0.3
 - Replace is disabled (button and right-click menu) and rejected when the selected image is already the one mounted on that drive
 

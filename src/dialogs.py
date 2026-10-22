@@ -3,6 +3,7 @@
 import tkinter as tk
 from tkinter import ttk
 
+import theme
 from constants import APP_TITLE
 
 
@@ -26,6 +27,7 @@ def make_dialog(root, title):
     """
     win = tk.Toplevel(root)
     win.title(title)
+    win.configure(background=theme.BG)
     win.resizable(False, False)
     if root.winfo_viewable():
         win.transient(root)
@@ -79,15 +81,18 @@ class QuitDialog:
         self.win.bind("<Escape>", lambda e: self._cancel())
         frame = ttk.Frame(self.win, padding=16)
         frame.pack()
-        ttk.Label(frame, text="Images are still mounted:", font=("Segoe UI", 10, "bold")).pack(anchor="w")
+        ttk.Label(frame, text="Images are still mounted:", font=("Segoe UI", 10, "bold"),
+                  foreground=theme.WARNING).pack(anchor="w")
         listing = "\n".join(f"  {r.letter}:  {r.name}" for r in records)
         ttk.Label(frame, text=listing, justify="left").pack(anchor="w", pady=(4, 10))
         ttk.Label(frame, text="Unmount them before exiting, or leave them mounted?").pack(anchor="w")
         row = ttk.Frame(frame)
         row.pack(fill="x", pady=(14, 0))
-        b = ttk.Button(row, text="Unmount all and exit", command=lambda: self._done("unmount"))
+        b = ttk.Button(row, text="Unmount all and exit", style="Accent.TButton",
+                       command=lambda: self._done("unmount"))
         b.pack(side="left")
-        ttk.Button(row, text="Exit immediately", command=lambda: self._done("exit")).pack(side="left", padx=6)
+        ttk.Button(row, text="Exit immediately", style="Danger.TButton",
+                   command=lambda: self._done("exit")).pack(side="left", padx=6)
         ttk.Button(row, text="Cancel", command=self._cancel).pack(side="right")
         b.focus_set()
         center_window(self.win, root)

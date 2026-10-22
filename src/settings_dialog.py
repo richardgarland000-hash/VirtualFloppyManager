@@ -4,6 +4,7 @@ import re
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
+import theme
 from dialogs import center_window, make_dialog
 
 
@@ -29,10 +30,10 @@ class SettingsDialog:
 
         ttk.Label(frm, text="ImDisk executable:").grid(row=0, column=0, sticky="w", pady=3)
         ttk.Entry(frm, textvariable=self.v_imdisk, width=46).grid(row=0, column=1, sticky="ew", padx=6)
-        ttk.Button(frm, text="Browse...", command=self._browse).grid(row=0, column=2)
+        ttk.Button(frm, text="Browse...", style="Accent.TButton", command=self._browse).grid(row=0, column=2)
         found = app.backend.locate()
         ttk.Label(frm, text=f"Detected: {found}" if found else "Detected: not found (blank = auto-detect)",
-                  foreground="#555").grid(row=1, column=1, columnspan=2, sticky="w", padx=6)
+                  foreground=theme.MUTED).grid(row=1, column=1, columnspan=2, sticky="w", padx=6)
 
         ttk.Label(frm, text="Allowed extensions:").grid(row=2, column=0, sticky="w", pady=3)
         ttk.Entry(frm, textvariable=self.v_exts).grid(row=2, column=1, columnspan=2, sticky="ew", padx=6)
@@ -53,9 +54,10 @@ class SettingsDialog:
         row = ttk.Frame(frm)
         row.grid(row=12, column=0, columnspan=3, sticky="ew", pady=(14, 0))
         ttk.Button(row, text="Clear image history", command=self._clear_history).pack(side="left")
-        ttk.Button(row, text="Restart as administrator", command=self._restart_admin).pack(side="left", padx=6)
+        ttk.Button(row, text="Restart as administrator", style="Warning.TButton",
+                   command=self._restart_admin).pack(side="left", padx=6)
         ttk.Button(row, text="Cancel", command=self.win.destroy).pack(side="right")
-        ttk.Button(row, text="Save", command=self._save).pack(side="right", padx=6)
+        ttk.Button(row, text="Save", style="Accent.TButton", command=self._save).pack(side="right", padx=6)
 
         self.win.bind("<Escape>", lambda e: self.win.destroy())
         center_window(self.win, root)
