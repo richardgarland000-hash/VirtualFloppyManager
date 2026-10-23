@@ -270,9 +270,19 @@ class MountManager:
             raise BackendError(f"Drive {letter}: is still present after forced unmount.", "in_use")
         notify_shell(letter, False)
 
-    def unmount_all(self, force=False, progress=None):
+    def partition_by_startup(self):
+        """(flagged, others): mounted records that are / are not flagged 'mount at startup'."""
+        flagged, others = [], []
+        for rec in self.snapshot():
+            (flagged if self.is_startup_image(rec.image) else others).append(rec)
+        return flagged, others
+
+    def unmount_all(self, force=False, progress=None, letters=None):
+        """Unmount every image, or only those whose drive letter is in `letters`."""
         failures = []
         for rec in self.snapshot():
+            if letters is not None and rec.letter not in letters:
+                continue
             try:
                 self.unmount(rec.letter, force, progress)
             except Exception as exc:

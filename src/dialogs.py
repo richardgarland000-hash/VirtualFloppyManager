@@ -72,10 +72,15 @@ class ProgressDialog:
 
 
 class QuitDialog:
-    """Asks what to do with mounted images on exit. show() -> unmount | exit | cancel."""
+    """Asks what to do with mounted images on exit.
 
-    def __init__(self, root, records):
+    show() -> "unmount" | "unmount_others" | "exit" | "cancel"
+    "unmount_others" (unmount everything not flagged for startup) is offered only when the
+    mounted images are a mix of flagged and unflagged ones."""
+
+    def __init__(self, root, records, startup_letters=frozenset()):
         self.result = "cancel"
+        self.root = root
         self.win = make_dialog(root, f"Quit {APP_TITLE}")
         self.win.protocol("WM_DELETE_WINDOW", self._cancel)
         self.win.bind("<Escape>", lambda e: self._cancel())
@@ -83,21 +88,31 @@ class QuitDialog:
         frame.pack()
         ttk.Label(frame, text="Images are still mounted:", font=("Segoe UI", 10, "bold"),
                   foreground=theme.WARNING).pack(anchor="w")
-        listing = "\n".join(f"  {r.letter}:  {r.name}" for r in records)
+        listing = "\n".join(
+            f"  {r.letter}:  {r.name}" + ("   (mounted at startup)" if r.letter in startup_letters else "")
+            for r in records)
         ttk.Label(frame, text=listing, justify="left").pack(anchor="w", pady=(4, 10))
-        ttk.Label(frame, text="Unmount them before exiting, or leave them mounted?").pack(anchor="w")
-        row = ttk.Frame(frame)
-        row.pack(fill="x", pady=(14, 0))
-        b = ttk.Button(row, text="Unmount all and exit", style="Accent.TButton",
+        ttk.Label(frame, text="What should happen to them?").pack(anchor="w")
+
+        flagged = [r for r in records if r.letter in startup_letters]
+        mixed = bool(flagged) and len(flagged) < len(records)
+
+        buttons = ttk.Frame(frame)
+        buttons.pack(fill="x", pady=(12, 0))
+        first = ttk.Button(buttons, text="Unmount all and exit", style="Accent.TButton",
                        command=lambda: self._done("unmount"))
-        b.pack(side="left")
-        ttk.Button(row, text="Exit immediately", style="Danger.TButton",
-                   command=lambda: self._done("exit")).pack(side="left", padx=6)
-        ttk.Button(row, text="Cancel", command=self._cancel).pack(side="right")
-        b.focus_set()
+        first.pack(fill="x", pady=2)
+        default = first
+        if mixed:
+            default = ttk.Button(buttons, text="Unmount all except startup images, then exit",
+                                 style="Success.TButton", command=lambda: self._done("unmount_others"))
+            default.pack(fill="x", pady=2)
+        ttk.Button(buttons, text="Exit immediately (leave all mounted)", style="Danger.TButton",
+                   command=lambda: self._done("exit")).pack(fill="x", pady=2)
+        ttk.Button(buttons, text="Cancel", command=self._cancel).pack(fill="x", pady=2)
+        default.focus_set()
         center_window(self.win, root)
         self.win.attributes("-topmost", True)
-        self.root = root
 
     def _done(self, value):
         self.result = value

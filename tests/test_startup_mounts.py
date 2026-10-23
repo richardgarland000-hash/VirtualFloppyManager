@@ -17,6 +17,9 @@ class FakeBackend:
         self.mounted.append((os.path.basename(image), letter))
         self.used.add(letter)
 
+    def unmount(self, letter, force=False):
+        self.used.discard(letter)
+
     def is_device(self, letter):
         return False
 
@@ -109,3 +112,41 @@ def test_already_mounted_image_is_skipped(env):
     backend.mounted.clear()
     assert mgr.mount_startup_images() == []
     assert backend.mounted == []
+
+
+def mount_three(mgr, image):
+    a, b, c = image("a.img"), image("b.img"), image("c.img")
+    for img, letter in ((a, "E"), (b, "F"), (c, "G")):
+        mgr.mount(img, letter)
+    return a, b, c
+
+
+def test_partition_by_startup(env):
+    mgr, _, _, image = env
+    a, b, c = mount_three(mgr, image)
+    mgr.set_startup(a, "E", True)
+    mgr.set_startup(c, "G", True)
+    flagged, others = mgr.partition_by_startup()
+    assert [r.letter for r in flagged] == ["E", "G"]
+    assert [r.letter for r in others] == ["F"]
+
+
+def test_unmount_all_except_startup_images(env):
+    mgr, _, used, image = env
+    a, b, c = mount_three(mgr, image)
+    mgr.set_startup(a, "E", True)
+    _, others = mgr.partition_by_startup()
+    failures = mgr.unmount_all(letters={r.letter for r in others})
+    assert failures == []
+    assert sorted(r.letter for r in mgr.snapshot()) == ["E"]       # the startup image stays mounted
+    assert "E" in used and "F" not in used and "G" not in used
+    assert mgr.is_startup_image(a)                                 # and keeps its startup flag
+
+
+def test_unmount_all_without_filter_unmounts_everything(env):
+    mgr, _, _, image = env
+    a, _, _ = mount_three(mgr, image)
+    mgr.set_startup(a, "E", True)
+    assert mgr.unmount_all() == []
+    assert mgr.snapshot() == []
+    assert mgr.is_startup_image(a)                                 # startup list survives unmounting

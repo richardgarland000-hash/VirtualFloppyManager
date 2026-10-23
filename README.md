@@ -1,4 +1,4 @@
-# Floppy Image Mounter Version 1.2.0
+# Floppy Image Mounter Version 1.2.1
 
 A Windows system-tray utility that mounts raw floppy disk images (`.img`, `.ima`, `.flp`, `.vfd`, `.dsk`, `.xdf`, ...) as drive letters, detects the disk's filesystem structure, and keeps track of what is mounted where.
 
@@ -33,7 +33,7 @@ This project utilizes the [ImDisk Toolkit](https://sourceforge.net/projects/imdi
 Grab `FloppyMounter.exe` (or the zip) from the **Releases** page. Verify against `SHA256SUMS.txt`. The exe is unsigned, so SmartScreen may warn on first run.
 
 ## Mount at startup
-Tick **Mount at startup** in the Mount section before clicking Mount (or right-click an image in the list > *Mount at startup*). The list shows a **Yes** in the *At startup* column. On the next start the program remounts those images on their saved letters. If a letter is taken it uses the next free one and tells you; if an image file is missing you are told and the entry is kept. Remove entries under **Settings > Mounted at startup**. Quitting with "Unmount all and exit" keeps the startup list.
+Tick **Mount at startup** in the Mount section before clicking Mount (or right-click an image in the list > *Mount at startup*). The list shows a **Yes** in the *At startup* column. On the next start the program remounts those images on their saved letters. If a letter is taken it uses the next free one and tells you; if an image file is missing you are told and the entry is kept. Remove entries under **Settings > Mounted at startup**. When you quit with images mounted you can unmount everything, **unmount everything except the startup images** (shown when you have both kinds mounted), or exit immediately and leave all mounted. The startup list itself is never cleared by unmounting.
 
 ## Drag and drop
 Drop an image file onto the image box (or the info panel under it) to select it. Because the program runs as administrator, Windows normally blocks drops from a non-elevated Explorer window. The program opens the window-message filter for the shell's drop messages to allow it. If a drop is refused on your system, use Browse instead.

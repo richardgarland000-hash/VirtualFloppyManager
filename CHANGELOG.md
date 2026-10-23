@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.2.1
+- Exit dialog: new "Unmount all except startup images, then exit" option (shown when the mounted images are a mix of startup and non-startup ones); startup images are marked in the list and stay mounted
+
 ## 1.2.0
 - "Mount at startup" option in the Mount section: flagged images are mounted automatically when the program starts, shown in a new "At startup" column, toggled from the right-click menu, and managed under Settings > Mounted at startup
 - If a startup image's drive letter is taken, the next free letter is used; missing images are reported (balloon notification when hidden in the tray) and kept in the list

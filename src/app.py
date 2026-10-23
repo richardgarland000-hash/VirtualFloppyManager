@@ -351,13 +351,17 @@ class App:
         if not records:
             self._finish_quit()
             return
-        choice = QuitDialog(self.root, records).show()
+        flagged, others = self.manager.partition_by_startup()
+        choice = QuitDialog(self.root, records, {r.letter for r in flagged}).show()
         if choice == "unmount":
-            self._unmount_all_and_quit(False)
+            self._unmount_and_quit(False)
+        elif choice == "unmount_others":
+            self._unmount_and_quit(False, {r.letter for r in others})   # startup images stay mounted
         elif choice == "exit":
             self._finish_quit()
 
-    def _unmount_all_and_quit(self, force):
+    def _unmount_and_quit(self, force, letters=None):
+        """Unmount all images (letters=None) or just those drive letters, then exit."""
         def done(failures):
             if not failures:
                 self._finish_quit()
@@ -368,12 +372,12 @@ class App:
                 f"Could not unmount {names}.\n\nYes = force unmount\nNo = exit and leave them mounted\n"
                 "Cancel = keep the application open", icon="warning", parent=self.root)
             if ans is True:
-                self._unmount_all_and_quit(True)
+                self._unmount_and_quit(True, letters)
             elif ans is False:
                 self._finish_quit()
 
-        self.run_task("Unmounting all images",
-                      lambda p: self.manager.unmount_all(force, p), done)
+        self.run_task("Unmounting images" if letters is not None else "Unmounting all images",
+                      lambda p: self.manager.unmount_all(force, p, letters), done)
 
     def _finish_quit(self):
         log.info("Shutting down")
