@@ -32,6 +32,9 @@ This project utilizes the [ImDisk Toolkit](https://sourceforge.net/projects/imdi
 ## Download
 Grab `FloppyMounter.exe` (or the zip) from the **Releases** page. Verify against `SHA256SUMS.txt`. The exe is unsigned, so SmartScreen may warn on first run.
 
+## User manual
+The user manual for the application can be found [here](https://github.com/richardgarland000-hash/VirtualFloppyManager/wiki/User-Manual-%E2%80%90-Version-1.2.1).
+
 ## Mount at startup
 Tick **Mount at startup** in the Mount section before clicking Mount (or right-click an image in the list > *Mount at startup*). The list shows a **Yes** in the *At startup* column. On the next start the program remounts those images on their saved letters. If a letter is taken it uses the next free one and tells you; if an image file is missing you are told and the entry is kept. Remove entries under **Settings > Mounted at startup**. When you quit with images mounted you can unmount everything, **unmount everything except the startup images** (shown when you have both kinds mounted), or exit immediately and leave all mounted. The startup list itself is never cleared by unmounting.
 
