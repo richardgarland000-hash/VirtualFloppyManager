@@ -7,9 +7,9 @@ from tkinter import ttk, filedialog
 
 from PIL import Image, ImageTk
 
+import dropfiles
 import theme
 from constants import APP_TITLE
-from constants import VERSION
 from drive_utils import available_letters
 from image_inspector import inspect_image
 
@@ -27,14 +27,16 @@ class MainWindow:
         self._token = 0
         self._after_id = None
 
-        root.title(APP_TITLE + " Version " + VERSION)
-        root.geometry("740x660")
-        root.minsize(700, 620)
+        root.title(APP_TITLE)
+        root.geometry("840x690")
+        root.minsize(800, 650)
         root.protocol("WM_DELETE_WINDOW", app.on_close_button)
 
         self.image_var = tk.StringVar()
         self.letter_var = tk.StringVar()
         self.status_var = tk.StringVar()
+        self.startup_var = tk.BooleanVar(value=False)
+        self._menu_startup = tk.BooleanVar(value=False)
         self._build()
         self.image_var.trace_add("write", lambda *a: self._schedule_inspect())
 
@@ -72,27 +74,35 @@ class MainWindow:
         self.info.tag_configure("error", foreground=theme.DANGER)
         self.info.tag_configure("muted", foreground=theme.MUTED)
         self.info.pack(fill="x", pady=(10, 0))
-        self._set_info("No image selected.", "none")
+        self._set_info("No image selected. Browse for a file, or drag one here.", "none")
 
         drv = ttk.LabelFrame(main, text="Mount", padding=10)
         drv.pack(fill="x", pady=10)
-        ttk.Label(drv, text="Drive letter:").pack(side="left")
-        self.letter_combo = ttk.Combobox(drv, textvariable=self.letter_var, state="disabled", width=5)
+        top = ttk.Frame(drv)
+        top.pack(fill="x")
+        ttk.Label(top, text="Drive letter:").pack(side="left")
+        self.letter_combo = ttk.Combobox(top, textvariable=self.letter_var, state="disabled", width=5)
         self.letter_combo.pack(side="left", padx=8)
         self.letter_combo.bind("<<ComboboxSelected>>", lambda e: self.update_states())
-        self.mount_btn = ttk.Button(drv, text="Mount", style="Success.TButton", command=self._mount)
+        self.mount_btn = ttk.Button(top, text="Mount", style="Success.TButton", command=self._mount)
         self.mount_btn.pack(side="left", padx=(4, 0))
-        self.replace_btn = ttk.Button(drv, text="Replace selected mounted image with this one",
+        self.replace_btn = ttk.Button(top, text="Replace selected mounted image with this one",
                                       style="Warning.TButton", command=self._replace)
         self.replace_btn.pack(side="left", padx=8)
+        self.startup_check = ttk.Checkbutton(
+            drv, text="Mount at startup (mount this image automatically whenever the program starts)",
+            variable=self.startup_var, state="disabled")
+        self.startup_check.pack(anchor="w", pady=(10, 0))
 
         lst = ttk.LabelFrame(main, text="Mounted images", padding=10)
         lst.pack(fill="both", expand=True)
-        cols = ("drive", "image", "format")
+        cols = ("drive", "image", "format", "startup")
         self.tree = ttk.Treeview(lst, columns=cols, show="headings", height=6, selectmode="browse")
-        for col, text, width in (("drive", "Drive", 50), ("image", "Image", 190), ("format", "Format", 300)):
+        for col, text, width in (("drive", "Drive", 56), ("image", "Image", 205), ("format", "Format", 275), ("startup", "At startup", 88)):
             self.tree.heading(col, text=text)
-            self.tree.column(col, width=width, minwidth=50, anchor="w", stretch=(col != "drive"))
+            self.tree.column(col, width=width, minwidth=50,
+                             anchor="center" if col == "startup" else "w",
+                             stretch=col in ("image", "format"))
         self.tree.tag_configure("odd", background=theme.SURFACE)
         self.tree.tag_configure("even", background=theme.SURFACE_ALT)
         self.tree.tag_configure("ro", foreground=theme.READ_ONLY_TEXT)
@@ -111,10 +121,26 @@ class MainWindow:
         theme.style_menu(self.menu)
         self.menu.add_command(label="Unmount", command=self._unmount)
         self.menu.add_command(label="Replace with the selected image", command=self._replace)
+        self.menu.add_separator()
+        self.menu.add_checkbutton(label="Mount at startup", variable=self._menu_startup,
+                                  command=self._toggle_startup)
         self.tree.bind("<Button-3>", self._on_right_click)
 
 
         self.update_states()
+        for widget in (self.image_combo, self.info):
+            dropfiles.hook(widget, self._on_drop)
+
+    def _on_drop(self, paths):
+        if self.app.busy:
+            self.status("Busy - drop the file again when the current operation finishes.", "warn")
+            return
+        path, message, kind = dropfiles.pick_image(paths)
+        if path is None:
+            self.status(message, kind)
+            return
+        self.image_var.set(os.path.normpath(path))
+        self.status(message or f"Selected {os.path.basename(path)}.", kind)
 
     def _build_header(self):
         header = tk.Frame(self.root, bg=theme.HEADER)
@@ -197,7 +223,7 @@ class MainWindow:
         self._token += 1
         token = self._token
         if not path:
-            self._set_info("No image selected.", "none")
+            self._set_info("No image selected. Browse for a file, or drag one here.", "none")
             return
         self._set_info("Reading image...", "busy")
 
@@ -225,6 +251,8 @@ class MainWindow:
         else:
             kind = "ok"
         self._set_info(text, kind)
+        if self._image_ok:
+            self.startup_var.set(self.app.manager.is_startup_image(self.current_image()))
         self.update_states()
 
     # ---- actions -----------------------------------------------------
@@ -241,15 +269,22 @@ class MainWindow:
         self.menu.entryconfigure(
             1, state="normal" if self._image_ok and not busy and not self._same_as_mounted(letter)
             else "disabled")
+        rec = self.app.manager.get(letter)
+        self._menu_startup.set(bool(rec and self.app.manager.is_startup_image(rec.image)))
         try:
             self.menu.tk_popup(event.x_root, event.y_root)
         finally:
             self.menu.grab_release()
 
+    def _toggle_startup(self):
+        letter = self.selected_letter()
+        if letter:
+            self.app.set_startup_for_drive(letter, self._menu_startup.get())
+
     def _mount(self):
         letter = self.letter_var.get().rstrip(":")
         if self._image_ok and letter:
-            self.app.mount_image(self.current_image(), letter)
+            self.app.mount_image(self.current_image(), letter, startup=self.startup_var.get())
 
     def _unmount(self):
         letter = self.selected_letter()
@@ -259,7 +294,7 @@ class MainWindow:
     def _replace(self):
         letter = self.selected_letter()
         if letter and self._image_ok:
-            self.app.replace_drive(letter, self.current_image())
+            self.app.replace_drive(letter, self.current_image(), startup=self.startup_var.get())
 
     # ---- state refresh -----------------------------------------------
     def refresh(self, records):
@@ -268,7 +303,8 @@ class MainWindow:
         for i, r in enumerate(records):
             tags = ["even" if i % 2 else "odd"] + (["ro"] if r.read_only else [])
             fmt = r.fmt + ("  [read-only]" if r.read_only else "")
-            item = self.tree.insert("", "end", values=(f"{r.letter}:", r.image, fmt), tags=tags)
+            at_startup = "Yes" if self.app.manager.is_startup_image(r.image) else ""
+            item = self.tree.insert("", "end", values=(f"{r.letter}:", r.image, fmt, at_startup), tags=tags)
             if r.letter == keep:
                 self.tree.selection_set(item)
         avail = [f"{c}:" for c in available_letters()]
@@ -289,6 +325,7 @@ class MainWindow:
         sel = self.selected_letter()
         self.letter_combo.config(state="readonly" if ok and self.letter_combo["values"] else "disabled")
         self.mount_btn.config(state="normal" if ok and has_letter else "disabled")
+        self.startup_check.config(state="normal" if ok else "disabled")
         self.unmount_btn.config(state="normal" if sel and not busy else "disabled")
         self.replace_btn.config(
             state="normal" if sel and ok and not self._same_as_mounted(sel) else "disabled")

@@ -11,7 +11,7 @@ import time
 from dataclasses import dataclass, asdict
 from datetime import datetime
 
-from drive_utils import used_letters, wait_for_drive, notify_shell
+from drive_utils import available_letters, notify_shell, used_letters, wait_for_drive
 from image_inspector import inspect_image
 from imdisk_backend import BackendError
 
@@ -50,6 +50,23 @@ class MountRecord:
                        bool(d.get("read_only", False)), str(d.get("mounted_at", "")))
         except (KeyError, TypeError):
             return None
+
+
+@dataclass
+class StartupResult:
+    image: str
+    wanted_letter: str
+    record: "MountRecord" = None
+    error: Exception = None
+
+    @property
+    def name(self):
+        return os.path.basename(self.image)
+
+    @property
+    def moved(self):
+        """Mounted, but on a different letter than the one that was requested."""
+        return self.record is not None and self.record.letter != self.wanted_letter
 
 
 def _norm(path):
@@ -97,6 +114,61 @@ class MountManager:
             return False
         candidate = os.path.abspath(os.path.expanduser(image.strip().strip('"')))
         return _norm(rec.image) == _norm(candidate)
+
+    # ---- mount at startup ---------------------------------------------
+    def startup_entries(self):
+        """Valid entries of the 'mount at startup' list: [{"image", "letter"}]."""
+        entries = []
+        for e in self.config.get("startup_mounts"):
+            if isinstance(e, dict) and isinstance(e.get("image"), str) \
+                    and isinstance(e.get("letter"), str) and len(e["letter"].rstrip(":")) == 1:
+                entries.append({"image": e["image"], "letter": e["letter"].rstrip(":").upper()})
+        return entries
+
+    def is_startup_image(self, image):
+        norm = _norm(image)
+        return any(_norm(e["image"]) == norm for e in self.startup_entries())
+
+    def set_startup(self, image, letter, enabled):
+        """Add (enabled) or remove (disabled) an image from the startup list. One entry per
+        image and per drive letter, so a new entry replaces an older one for the same letter."""
+        letter = letter.rstrip(":").upper()
+        norm = _norm(image)
+        with self._lock:
+            entries = [e for e in self.startup_entries()
+                       if _norm(e["image"]) != norm and not (enabled and e["letter"] == letter)]
+            if enabled:
+                entries.append({"image": os.path.abspath(image), "letter": letter})
+            self.config.set("startup_mounts", sorted(entries, key=lambda e: e["letter"]))
+
+    def mount_startup_images(self, progress=None):
+        """Mount every image flagged for startup. Blocking; returns a StartupResult per image.
+
+        Images that are already mounted (e.g. after an elevated restart) are skipped. If the
+        wanted letter is taken, the first free letter is used instead. Missing or unreadable
+        images are reported and their entries are kept."""
+        progress = progress or (lambda m: None)
+        results = []
+        for entry in self.startup_entries():
+            image, wanted = entry["image"], entry["letter"]
+            result = StartupResult(image, wanted)
+            try:
+                if any(_norm(r.image) == _norm(image) for r in self.snapshot()):
+                    continue
+                letter = wanted
+                if letter in used_letters():
+                    free = available_letters()
+                    if not free:
+                        raise ImageError("No free drive letters are available.")
+                    letter = free[0]
+                    log.warning("Startup mount: %s: is taken, using %s: for %s", wanted, letter, image)
+                progress(f"Mounting {result.name} on {letter}:...")
+                result.record = self.mount(image, letter, progress)
+            except Exception as exc:
+                log.error("Startup mount of %s failed: %s", image, exc)
+                result.error = exc
+            results.append(result)
+        return results
 
     # ---- validation --------------------------------------------------
     def validate_image(self, image, replacing=None):

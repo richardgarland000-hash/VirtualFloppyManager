@@ -1,1 +1,1 @@
-33dc23df0ec8b0aeb9692c608935778bffb78918e76a179fcc73924de9858aa3  FloppyMounter-1.1.0-win64-onedir.zip
+37fddc787c3013f70aa12269eaa50a38da6b25570a1293a5d9720cb3059b383e  FloppyMounter-1.2.0-win64-onedir.zip

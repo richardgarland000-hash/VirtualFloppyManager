@@ -23,6 +23,7 @@ DEFAULTS = {
     "last_dir": "",
     "history": [],                      # last 10 mounted images, newest first
     "mounted": [],                      # records of images we mounted
+    "startup_mounts": [],               # [{"image": path, "letter": "E"}] mounted when the app starts
 }
 
 

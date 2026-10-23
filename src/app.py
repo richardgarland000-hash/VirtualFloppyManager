@@ -116,7 +116,45 @@ class App:
 
     def _startup_reconcile(self):
         self.manager.reconcile(startup=True)
-        self.ui_call(self.refresh_state)
+        self.ui_call(self._begin_startup_mounts)
+
+    def _begin_startup_mounts(self):
+        """Runs on the Tk thread after stale records were dropped."""
+        self.refresh_state()
+        if not self.manager.startup_entries() or self.busy:
+            return
+        self.busy = True                      # blocks other operations; no progress dialog at logon
+        self.window.update_states()
+        self.window.status("Mounting startup images...")
+
+        def worker():
+            try:
+                results = self.manager.mount_startup_images()
+            except Exception:
+                log.exception("Startup mounts failed")
+                results = []
+            self.ui_call(lambda: self._startup_mounts_done(results))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _startup_mounts_done(self, results):
+        self.busy = False
+        self.refresh_state()
+        ok = [r for r in results if r.record]
+        problems = [f"{r.name}: {r.error}" for r in results if r.error]
+        problems += [f"{r.name} was mounted on {r.record.letter}: because {r.wanted_letter}: is in use."
+                     for r in results if r.moved]
+        if not results:
+            self.window.status("")
+        elif problems:
+            self.window.status(f"Startup: mounted {len(ok)} of {len(results)} images - see details.", "warn")
+            text = "\n".join(problems)
+            if self.root.winfo_viewable():
+                messagebox.showwarning("Startup mounts", text, parent=self.root)
+            else:
+                self.tray.notify(text)
+        else:
+            self.window.status(f"Mounted {len(ok)} startup image{'s' if len(ok) != 1 else ''}.", "success")
 
     def _signature(self):
         return (tuple((r.letter, r.image) for r in self.manager.snapshot()), tuple(available_letters()))
@@ -187,7 +225,7 @@ class App:
             f"'{os.path.splitext(image)[1] or '(none)'}' is not in your list of allowed extensions "
             f"({' '.join(allowed)}).\n\nTry to mount it anyway?", parent=self.root)
 
-    def mount_image(self, image, letter, force_first=False):
+    def mount_image(self, image, letter, startup=False, force_first=False):
         if not force_first and not self._extension_ok(image):
             return
 
@@ -196,18 +234,21 @@ class App:
                 self.manager.force_unmount_foreign(letter, progress)
             return self.manager.mount(image, letter, progress)
 
-        self.run_task(f"Mounting on {letter}:", work, self._after_mount,
-                      lambda e: self._mount_error(e, image, letter))
+        self.run_task(f"Mounting on {letter}:", work, lambda rec: self._after_mount(rec, startup),
+                      lambda e: self._mount_error(e, image, letter, startup))
 
-    def _after_mount(self, rec):
-        self.window.status(f"Mounted {rec.name} on {rec.letter}:", "success")
+    def _after_mount(self, rec, startup=False):
+        self.manager.set_startup(rec.image, rec.letter, startup)      # also clears the flag when unticked
+        self.refresh_state()
+        self.window.status(f"Mounted {rec.name} on {rec.letter}:" + (" (at startup)" if startup else ""),
+                           "success")
         if self.config.get("open_explorer_after_mount"):
             try:
                 os.startfile(f"{rec.letter}:\\")
             except OSError as exc:
                 log.warning("Could not open Explorer: %s", exc)
 
-    def _mount_error(self, exc, image, letter):
+    def _mount_error(self, exc, image, letter, startup=False):
         if isinstance(exc, ForeignDriveError):
             if exc.is_imdisk:
                 if messagebox.askyesno(
@@ -216,7 +257,7 @@ class App:
                         "images (it may have been mounted by another tool).\n\n"
                         "Force unmount it and mount the new image here? Open files on it may be lost.",
                         icon="warning", parent=self.root):
-                    self.mount_image(image, letter, force_first=True)
+                    self.mount_image(image, letter, startup=startup, force_first=True)
             else:
                 messagebox.showwarning(
                     "Drive already exists",
@@ -233,7 +274,7 @@ class App:
                       lambda _: self.window.status(f"Unmounted {letter}:", "success"),
                       lambda e: self._unmount_error(e, letter, lambda: self.unmount_drive(letter, True)))
 
-    def replace_drive(self, letter, image, force=False):
+    def replace_drive(self, letter, image, force=False, startup=False):
         if not force and not self._extension_ok(image):
             return
         if self.manager.is_same_image(letter, image):
@@ -247,10 +288,28 @@ class App:
                 f"Unmount {rec.name if rec else letter + ':'} from {letter}: and mount the new image there?",
                 parent=self.root):
             return
+        old_image = rec.image if rec else None
+
+        def done(new_rec):
+            if old_image:
+                self.manager.set_startup(old_image, letter, False)    # the old image is gone from this drive
+            self._after_mount(new_rec, startup)
+
         self.run_task(f"Replacing image on {letter}:",
-                      lambda p: self.manager.replace(letter, image, force, p),
-                      self._after_mount,
-                      lambda e: self._unmount_error(e, letter, lambda: self.replace_drive(letter, image, True)))
+                      lambda p: self.manager.replace(letter, image, force, p), done,
+                      lambda e: self._unmount_error(
+                          e, letter, lambda: self.replace_drive(letter, image, True, startup)))
+
+    def set_startup_for_drive(self, letter, enabled):
+        """Right-click toggle on a mounted image."""
+        rec = self.manager.get(letter)
+        if not rec:
+            return
+        self.manager.set_startup(rec.image, rec.letter, enabled)
+        self.refresh_state()
+        self.window.status(
+            f"{rec.name} will be mounted at startup." if enabled
+            else f"{rec.name} will no longer be mounted at startup.", "success")
 
     def _unmount_error(self, exc, letter, force_action):
         if isinstance(exc, BackendError) and exc.kind == "in_use":

@@ -60,6 +60,12 @@ class TrayIcon:
     def _quit(self, icon=None, item=None):
         self.app.ui_call(self.app.request_quit)
 
+    def notify(self, message):
+        try:
+            self.icon.notify(message[:240], APP_TITLE)
+        except Exception as exc:
+            log.debug("Tray notification failed: %s", exc)
+
     # ---- state -------------------------------------------------------
     def update(self, records):
         if records:

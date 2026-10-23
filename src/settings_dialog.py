@@ -51,6 +51,23 @@ class SettingsDialog:
         for i, (text, var) in enumerate(opts):
             ttk.Checkbutton(frm, text=text, variable=var).grid(row=5 + i, column=0, columnspan=3, sticky="w")
 
+        box = ttk.LabelFrame(frm, text="Mounted at startup", padding=8)
+        box.grid(row=11, column=0, columnspan=3, sticky="ew", pady=(10, 0))
+        box.columnconfigure(0, weight=1)
+        self._startup = app.manager.startup_entries()
+        self.startup_list = tk.Listbox(
+            box, height=4, activestyle="none", exportselection=False, bg=theme.SURFACE, fg=theme.TEXT,
+            selectbackground=theme.SELECTION, selectforeground=theme.SELECTION_TEXT, relief="flat",
+            highlightthickness=1, highlightbackground=theme.BORDER, highlightcolor=theme.ACCENT,
+            font=theme.FONT)
+        self.startup_list.grid(row=0, column=0, sticky="ew")
+        ttk.Button(box, text="Remove", style="Danger.TButton",
+                   command=self._remove_startup).grid(row=0, column=1, padx=(8, 0), sticky="n")
+        ttk.Label(box, text="These images are mounted when the program starts. Tick \"Mount at startup\" "
+                            "in the main window to add one.", foreground=theme.MUTED,
+                  wraplength=520).grid(row=1, column=0, columnspan=2, sticky="w", pady=(6, 0))
+        self._fill_startup()
+
         row = ttk.Frame(frm)
         row.grid(row=12, column=0, columnspan=3, sticky="ew", pady=(14, 0))
         ttk.Button(row, text="Clear image history", command=self._clear_history).pack(side="left")
@@ -78,6 +95,17 @@ class SettingsDialog:
                                           filetypes=[("imdisk.exe", "imdisk.exe"), ("Programs", "*.exe")])
         if path:
             self.v_imdisk.set(path)
+
+    def _fill_startup(self):
+        self.startup_list.delete(0, "end")
+        for entry in self._startup:
+            self.startup_list.insert("end", f"{entry['letter']}:   {entry['image']}")
+
+    def _remove_startup(self):
+        selection = self.startup_list.curselection()
+        if selection:
+            del self._startup[selection[0]]
+            self._fill_startup()
 
     def _clear_history(self):
         self.app.config.clear_history()
@@ -113,6 +141,7 @@ class SettingsDialog:
             "removable_media": self.v_rem.get(),
             "open_explorer_after_mount": self.v_explorer.get(),
             "auto_elevate": self.v_elevate.get(),
+            "startup_mounts": self._startup,
             "start_hidden": self.v_hidden.get(),
             "close_button_hides": self.v_close.get(),
         })
